@@ -1,6 +1,4 @@
 use crate::model::Model;
-use crate::utils::standardize;
-use crate::{get_training_data, utils::normalize};
 use rand::{thread_rng, Rng};
 
 pub struct PolynomialRegression {

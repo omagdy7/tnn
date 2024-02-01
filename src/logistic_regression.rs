@@ -1,12 +1,12 @@
 use crate::model::Model;
 use rand::{thread_rng, Rng};
 
-pub struct LinearRegression {
+pub struct LogisticRegression {
     weights: Vec<f64>,
     bias: f64,
 }
 
-impl LinearRegression {
+impl LogisticRegression {
     pub fn new(num_of_features: usize) -> Self {
         let mut rng = thread_rng();
         let mut weights: Vec<f64> = vec![0.0; num_of_features];
@@ -14,11 +14,11 @@ impl LinearRegression {
             *w = rng.gen_range(0.00..3.00);
         }
         let bias = rng.gen_range(0.00..1.00);
-        LinearRegression { weights, bias }
+        LogisticRegression { weights, bias }
     }
 }
 
-impl Model for LinearRegression {
+impl Model for LogisticRegression {
     fn cost<F: Fn(f64) -> f64>(
         &self,
         training_data: &Vec<Vec<f64>>,

@@ -2,10 +2,15 @@ use std::fs;
 
 pub fn get_training_data(mut path: &str) -> Vec<Vec<f64>> {
     let contents = fs::read_to_string(&mut path).unwrap();
-    let mut training_data = vec![];
+    let line = contents.lines().next().unwrap();
+    let cols = line.chars().filter(|ch| *ch == ' ').count() + 1;
+
+    let mut training_data = vec![vec![]; cols];
     for line in contents.lines() {
         let line: Vec<f64> = line.split(' ').map(|x| x.parse::<f64>().unwrap()).collect();
-        training_data.push(line);
+        for i in 0..cols {
+            training_data[i].push(line[i]);
+        }
     }
     return training_data;
 }
@@ -25,24 +30,24 @@ fn maxf(f: f64, s: f64) -> f64 {
     }
 }
 
-pub fn normalize(data: Vec<Vec<f64>>) -> (Vec<Vec<f64>>, f64, f64) {
-    println!("Normalizing {data:#?}");
+pub fn normalize(mut data: Vec<Vec<f64>>) -> (Vec<Vec<f64>>, f64, f64) {
+    let y = data.pop().unwrap();
+    let mut normalized_data = vec![vec![0.0; data[0].len()]; data.len()];
     let mut max_x = f64::MIN;
-    let mut max_y = f64::MIN;
     let mut min_x = f64::MAX;
-    let mut min_y = f64::MAX;
-    for row in data.iter() {
-        max_x = maxf(max_x, row[0]);
-        max_y = maxf(max_y, row[1]);
-        min_x = minf(min_x, row[0]);
-        min_y = minf(min_y, row[1]);
+    for i in 0..data.len() {
+        for j in 0..data[i].len() {
+            max_x = maxf(max_x, data[i][j]);
+            min_x = minf(min_x, data[i][j]);
+        }
     }
-    println!("{max_x}, {max_y}, {min_x}, {min_y}");
-    let mut normalized_data = vec![];
-    for row in data.iter() {
-        let (x, y) = (row[0], row[1]);
-        normalized_data.push(vec![(x - min_x) / (max_x - min_x), row[1]])
+    for i in 0..data.len() {
+        for j in 0..data[i].len() {
+            let x = data[i][j];
+            normalized_data[i][j] = (x - min_x) / (max_x - min_x)
+        }
     }
+    normalized_data.push(y);
     (normalized_data, min_x, max_x)
 }
 

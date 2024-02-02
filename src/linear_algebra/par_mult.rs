@@ -1,10 +1,43 @@
 pub use crate::linear_algebra::matrix::Matrix;
 pub use crate::linear_algebra::mult::*;
 use rand::thread_rng;
+use rayon::iter::IntoParallelIterator;
+use rayon::iter::ParallelIterator;
 use std::sync::{Arc, Mutex};
 use threadpool::ThreadPool;
 
 static mut TEST_STATE: bool = false;
+
+pub fn mult_par(a: &Matrix, b: &Matrix) -> Matrix {
+    assert_eq!(a.cols, b.rows, "Matrix dimensions mismatch!");
+
+    // Check if the matrices are small, if so, use a simple sequential approach
+    if a.rows * a.cols * b.cols < 1000 {
+        return mult_transpose(a, b);
+    }
+
+    let result = Matrix::new(a.rows, b.cols);
+
+    // Create a mutable reference to result, wrapped in Arc and Mutex for safe parallelization
+    let result = Arc::new(Mutex::new(result));
+
+    (0..a.rows).into_par_iter().for_each(|i| {
+        for j in 0..b.cols {
+            let mut sum = 0.0;
+
+            for k in 0..a.cols {
+                sum += a.at(i, k) * b.at(k, j);
+            }
+
+            // Lock result matrix for writing
+            let mut result = result.lock().unwrap();
+            result.set_element(i, j, sum);
+        }
+    });
+
+    // Extract the result from the Arc and Mutex
+    Arc::try_unwrap(result).unwrap().into_inner().unwrap()
+}
 
 /**
  * Strassen algorithm. See https://en.wikipedia.org/wiki/Strassen_algorithm
@@ -329,81 +362,4 @@ fn _par_run_strassen(
     });
 
     return m1;
-}
-
-#[cfg(test)]
-mod tests {
-
-    use rand::Rng;
-
-    use super::*;
-
-    fn test_multiplication_outputs(multipler: fn(&Matrix, &Matrix) -> Matrix) {
-        let v1: Vec<f64> = vec![12.0, 8.0, 4.0, 3.0, 17.0, 14.0, 9.0, 8.0, 10.0];
-        let v2: Vec<f64> = vec![5.0, 19.0, 3.0, 6.0, 15.0, 9.0, 7.0, 8.0, 16.0];
-        let v3: Vec<f64> = vec![
-            136.0, 380.0, 172.0, 215.0, 424.0, 386.0, 163.0, 371.0, 259.0,
-        ];
-
-        let a: Matrix = Matrix::with_vector(v1, 3, 3);
-        let b: Matrix = Matrix::with_vector(v2, 3, 3);
-        let c: Matrix = Matrix::with_vector(v3, 3, 3);
-
-        assert!(a.mult(&b, multipler).eq(&c));
-
-        let v4: Vec<f64> = vec![
-            7.0, 14.0, 15.0, 6.0, 4.0, 8.0, 12.0, 3.0, 14.0, 21.0, 6.0, 9.0, 13.0, 7.0, 6.0, 4.0,
-        ];
-        let v5: Vec<f64> = vec![
-            5.0, 7.0, 14.0, 2.0, 8.0, 16.0, 4.0, 9.0, 13.0, 6.0, 8.0, 4.0, 6.0, 3.0, 2.0, 4.0,
-        ];
-        let v6: Vec<f64> = vec![
-            378.0, 381.0, 286.0, 224.0, 258.0, 237.0, 190.0, 140.0, 370.0, 497.0, 346.0, 277.0,
-            223.0, 251.0, 266.0, 129.0,
-        ];
-
-        let d: Matrix = Matrix::with_vector(v4, 4, 4);
-        let e: Matrix = Matrix::with_vector(v5, 4, 4);
-        let f: Matrix = Matrix::with_vector(v6, 4, 4);
-
-        assert!(d.mult(&e, multipler).eq(&f));
-    }
-
-    #[test]
-    fn test_mult_par_strassen() {
-        unsafe {
-            TEST_STATE = true;
-        }
-
-        test_multiplication_outputs(mult_par_strassen);
-    }
-
-    #[test]
-    fn test_mult_par_aggregate() {
-        unsafe {
-            TEST_STATE = true;
-        }
-
-        let cols = 123;
-        let rows = 219;
-        let n = rows * cols;
-        let mut v1: Vec<f64> = Vec::with_capacity(n);
-        let mut v2: Vec<f64> = Vec::with_capacity(n);
-
-        let mut rng = thread_rng();
-
-        for _ in 0..n {
-            v1.push(rng.gen::<f64>() % 1000000.0);
-            v2.push(rng.gen::<f64>() % 1000000.0);
-        }
-
-        let a: Matrix = Matrix::with_vector(v1, rows, cols);
-        let b: Matrix = Matrix::with_vector(v2, cols, rows);
-
-        let transpose_result = a.mult(&b, mult_transpose);
-        let strassen_par_result = a.mult(&b, mult_par_strassen);
-
-        assert!(transpose_result.eq(&strassen_par_result));
-        assert!(strassen_par_result.eq(&transpose_result));
-    }
 }

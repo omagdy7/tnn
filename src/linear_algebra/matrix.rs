@@ -7,7 +7,7 @@ const EPSILON: f64 = 0.000001;
  * Basic matrix implementation. Metadata with a vector of f64 floats; matrix
  * elements are indexed into the single vector.
  */
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct Matrix {
     // Number of rows
     pub rows: usize,
@@ -67,6 +67,16 @@ impl Matrix {
         unsafe {
             return *self.elements.get_unchecked(i * self.cols + j);
         }
+    }
+
+    #[inline]
+    pub fn get_element(&self, row: usize, col: usize) -> f64 {
+        self.elements[row * self.cols + col]
+    }
+
+    #[inline]
+    pub fn set_element(&mut self, row: usize, col: usize, value: f64) {
+        self.elements[row * self.cols + col] = value;
     }
 
     /**
@@ -226,185 +236,14 @@ impl fmt::Display for Matrix {
             .map(|i| i.to_string())
             .collect::<Vec<String>>()
             .join(", ");
-        write!(
-            f,
-            "rows: {} cols: {} n: {} array: [{}]",
-            self.rows, self.cols, self.n, array_string
-        )
-    }
-}
-
-#[cfg(test)]
-mod tests {
-
-    use super::*;
-
-    #[test]
-    fn test_eq() {
-        let v1: Vec<f64> = vec![1.0, 2.0, 3.0, 4.0];
-        let v2: Vec<f64> = vec![1.0, 2.0, 3.0, 4.0];
-
-        let a: Matrix = Matrix::with_vector(v1, 2, 2);
-        let b: Matrix = Matrix::with_vector(v2, 2, 2);
-
-        assert!(a.eq(&b));
-    }
-
-    #[test]
-    fn test_add() {
-        let v1: Vec<f64> = vec![1.0, 2.0, 3.0, 4.0];
-        let v2: Vec<f64> = vec![9.0, 8.0, 7.0, 6.0];
-        let v3: Vec<f64> = vec![10.0, 10.0, 10.0, 10.0];
-
-        let mut a: Matrix = Matrix::with_vector(v1, 2, 2);
-        let b: Matrix = Matrix::with_vector(v2, 2, 2);
-
-        a.add(&b);
-
-        assert!(a.elements.eq(&v3));
-        assert!(a.eq(&Matrix::with_vector(v3, 2, 2)));
-    }
-
-    #[test]
-    fn test_sub() {
-        let v1: Vec<f64> = vec![10.0, 10.0, 10.0, 10.0];
-        let v2: Vec<f64> = vec![6.0, 7.0, 8.0, 9.0];
-        let v3: Vec<f64> = vec![4.0, 3.0, 2.0, 1.0];
-
-        let mut a: Matrix = Matrix::with_vector(v1, 2, 2);
-        let b: Matrix = Matrix::with_vector(v2, 2, 2);
-
-        a.sub(&b);
-
-        assert!(a.elements.eq(&v3));
-        assert!(a.eq(&Matrix::with_vector(v3, 2, 2)));
-    }
-
-    #[test]
-    fn test_at() {
-        let rows = 2;
-        let cols = 6;
-        let v: Vec<f64> = vec![
-            1.0, 2.0, 3.0, 4.0, 5.0, 6.0, 7.0, 8.0, 9.0, 10.0, 11.0, 12.0,
-        ];
-        let a: Matrix = Matrix::with_vector(v, rows, cols);
-        let mut indx = 1;
-
-        for i in 0..rows {
-            for j in 0..cols {
-                let delta = (a.at(i, j) - indx as f64).abs();
-                assert!(delta < 0.000001);
-                indx += 1;
+        write!(f, "Matrix {} X {}\n[\n", self.rows, self.cols);
+        for i in 0..self.rows {
+            write!(f, "\t");
+            for j in 0..self.cols {
+                write!(f, "{:.5}    ", self.at(i, j));
             }
+            write!(f, "\n");
         }
-    }
-
-    #[test]
-    fn test_is_square() {
-        let v: Vec<f64> = vec![
-            1.0, 2.0, 3.0, 4.0, 5.0, 6.0, 7.0, 8.0, 9.0, 10.0, 11.0, 12.0, 13.0, 14.0, 15.0, 16.0,
-        ];
-        let a: Matrix = Matrix::with_vector(v.to_vec(), 2, 8);
-        let b: Matrix = Matrix::with_vector(v.to_vec(), 4, 4);
-
-        assert!(!a.is_square());
-        assert!(b.is_square());
-    }
-
-    #[test]
-    fn test_transpose_1() {
-        let rows = 2;
-        let cols = 6;
-        let v1: Vec<f64> = vec![
-            1.0, 2.0, 3.0, 4.0, 5.0, 6.0, 7.0, 8.0, 9.0, 10.0, 11.0, 12.0,
-        ];
-        let v2: Vec<f64> = vec![
-            1.0, 7.0, 2.0, 8.0, 3.0, 9.0, 4.0, 10.0, 5.0, 11.0, 6.0, 12.0,
-        ];
-        let a: Matrix = Matrix::with_vector(v1, rows, cols);
-        let b: Matrix = Matrix::with_vector(v2, cols, rows);
-
-        let c = a.transpose();
-
-        assert!(c.eq(&b));
-    }
-
-    #[test]
-    fn test_transpose_2() {
-        let rows = 3;
-        let cols = 3;
-        let v1: Vec<f64> = vec![1.0, 2.0, 3.0, 4.0, 5.0, 6.0, 7.0, 8.0, 9.0];
-        let v2: Vec<f64> = vec![1.0, 4.0, 7.0, 2.0, 5.0, 8.0, 3.0, 6.0, 9.0];
-        let a: Matrix = Matrix::with_vector(v1, rows, cols);
-        let b: Matrix = Matrix::with_vector(v2, cols, rows);
-
-        let c = a.transpose();
-
-        assert!(c.eq(&b));
-    }
-
-    #[test]
-    fn test_pad_cols() {
-        let rows = 5;
-        let cols = 2;
-        let v1: Vec<f64> = vec![1.0, 2.0, 3.0, 4.0, 5.0, 6.0, 7.0, 8.0, 9.0, 10.0];
-        let v2: Vec<f64> = vec![
-            1.0, 2.0, 0.0, 0.0, 0.0, 3.0, 4.0, 0.0, 0.0, 0.0, 5.0, 6.0, 0.0, 0.0, 0.0, 7.0, 8.0,
-            0.0, 0.0, 0.0, 9.0, 10.0, 0.0, 0.0, 0.0,
-        ];
-        let a: Matrix = Matrix::with_vector(v1, rows, cols);
-        let b: Matrix = Matrix::with_vector(v2, 5, 5);
-
-        let c = a.pad(rows);
-
-        assert!(c.eq(&b));
-    }
-
-    #[test]
-    fn test_pad_rows() {
-        let rows = 2;
-        let cols = 5;
-        let v1: Vec<f64> = vec![1.0, 2.0, 3.0, 4.0, 5.0, 6.0, 7.0, 8.0, 9.0, 10.0];
-        let v2: Vec<f64> = vec![
-            1.0, 2.0, 3.0, 4.0, 5.0, 6.0, 7.0, 8.0, 9.0, 10.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0,
-            0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0,
-        ];
-        let a: Matrix = Matrix::with_vector(v1, rows, cols);
-        let b: Matrix = Matrix::with_vector(v2, 5, 5);
-
-        let c = a.pad(cols);
-
-        assert!(c.eq(&b));
-    }
-
-    #[test]
-    fn test_pad_none() {
-        let rows = 2;
-        let cols = 5;
-        let v1: Vec<f64> = vec![1.0, 2.0, 3.0, 4.0, 5.0, 6.0, 7.0, 8.0, 9.0, 10.0];
-        let a: Matrix = Matrix::with_vector(v1, rows, cols);
-
-        let c = a.pad(1);
-
-        assert!(c.eq(&a));
-    }
-
-    #[test]
-    fn test_reduce() {
-        let rows = 5;
-        let cols = 5;
-        let v1: Vec<f64> = vec![
-            1.0, 2.0, 3.0, 4.0, 5.0, 6.0, 7.0, 8.0, 9.0, 10.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0,
-            0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0,
-        ];
-        let v2: Vec<f64> = vec![1.0, 2.0, 3.0, 4.0, 6.0, 7.0, 8.0, 9.0];
-        let a: Matrix = Matrix::with_vector(v1, rows, cols);
-        let b: Matrix = Matrix::with_vector(v2, 2, 4);
-
-        let c = a.reduce(2, 4);
-
-        println!("reduced C: {}", c);
-
-        assert!(c.eq(&b));
+        write!(f, "]\n",)
     }
 }

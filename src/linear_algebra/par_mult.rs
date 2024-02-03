@@ -12,7 +12,7 @@ pub fn mult_par(a: &Matrix, b: &Matrix) -> Matrix {
     assert_eq!(a.cols, b.rows, "Matrix dimensions mismatch!");
 
     // Check if the matrices are small, if so, use a simple sequential approach
-    if a.rows * a.cols * b.cols < 1000 {
+    if a.rows * a.cols * b.cols < 4096 {
         return mult_transpose(a, b);
     }
 

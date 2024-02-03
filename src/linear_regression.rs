@@ -1,12 +1,28 @@
 use crate::{
-    linear_algebra::{
-        matrix::Matrix,
-        mult::mult_transpose,
-        par_mult::{self, mult_par, mult_par_strassen},
-    },
+    linear_algebra::{matrix::Matrix, par_mult::mult_par},
     model::Model,
+    utils::helper,
 };
-use rand::{thread_rng, Rng};
+use rand::thread_rng;
+
+// dx/dw =  (2 * X^T * (X * W + b - Y)) / Y.rows
+fn dcost_w(x: &Matrix, y: &Matrix, w: &Matrix, b: f64) -> Matrix {
+    let mut predictions = mult_par(x, w);
+    predictions.add_element_wise(b);
+    let errors = predictions.sub(y);
+    let x_t = x.transpose();
+    let mut gradient_w = mult_par(&x_t, &errors);
+    gradient_w.divide_element_wise(y.rows as f64);
+    gradient_w
+}
+
+// dx/db = 2 * x_i * w + b - y_i
+fn dcost_b(x: &Matrix, y: &Matrix, w: &Matrix, b: f64) -> f64 {
+    let mut predictions = mult_par(x, w);
+    predictions.add_element_wise(b);
+    let errors = predictions.sub(y);
+    errors.elements.iter().sum::<f64>() / y.rows as f64
+}
 
 pub struct LinearRegression {
     weights: Matrix,
@@ -18,10 +34,12 @@ impl LinearRegression {
         let mut rng = thread_rng();
         let mut weights: Vec<f64> = vec![0.0; num_of_features];
         for i in 0..num_of_features {
-            weights[i] = rng.gen_range(0.00..3.00);
+            // weights[i] = rng.gen_range(0.0..3.00);
+            weights[i] = 1.0;
         }
         let weights = Matrix::with_vector(weights, num_of_features, 1);
-        let bias = rng.gen_range(0.00..1.00);
+        // let bias = rng.gen_range(0.0..3.00);
+        let bias = 1.0;
         LinearRegression { weights, bias }
     }
 }
@@ -52,23 +70,30 @@ impl Model for LinearRegression {
         epochs: usize,
         activation_function: F,
     ) {
-        let eps = 0.001;
-        for _ in 0..epochs {
-            let c = self.cost(xs, y, &self.weights, self.bias, &activation_function);
-            let db =
-                (self.cost(xs, y, &self.weights, self.bias + eps, &activation_function) - c) / eps;
-            for i in 0..self.weights.rows {
-                let mut tmp_weights = self.weights.clone();
-                tmp_weights.elements[i] += eps;
-                let cost_i = self.cost(xs, y, &tmp_weights, self.bias, &activation_function);
-                let dw = (cost_i - c) / eps;
-                self.weights.elements[i] -= learning_rate * dw;
+        let mut elements = vec![];
+        for c in 0..xs.cols {
+            let mut x_c = vec![0.0; xs.rows];
+            for j in 0..xs.rows {
+                x_c[j] = xs.elements[j + c * xs.rows];
             }
+            elements.push(x_c);
+        }
+        let elements = helper(&elements);
+        let elements: Vec<f64> = elements.into_iter().flatten().collect();
+        let xs = &Matrix::with_vector(elements, xs.rows, self.weights.rows);
+        for _ in 0..epochs {
+            let db = dcost_b(xs, y, &self.weights, self.bias);
+            let mut gradient_w = dcost_w(xs, y, &self.weights, self.bias);
+            gradient_w.prod_element_wise(learning_rate);
+            // dbg!(&gradient_w);
+            self.weights.sub(&gradient_w);
             self.bias -= learning_rate * db;
+
             // println!(
-            //     "MSE = {:?}, self.weights = {:?}",
+            //     "MSE = {:?}, weights = {:?}, bias = {}",
             //     self.cost(xs, y, &self.weights, self.bias, &activation_function),
             //     self.weights,
+            //     self.bias,
             // );
         }
         println!(
@@ -85,6 +110,6 @@ impl Model for LinearRegression {
     }
 
     fn dump(&self) {
-        println!("weights: {:?}\nbias: {}", self.weights, self.bias);
+        println!("weights: {}\nbias: {}", self.weights, self.bias);
     }
 }

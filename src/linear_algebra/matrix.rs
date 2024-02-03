@@ -217,6 +217,62 @@ impl Matrix {
         return Matrix::with_vector(v, self.cols, self.rows);
     }
 
+    pub fn dot(&self, b: &Matrix) -> f64 {
+        assert!(self.rows == b.rows);
+        assert!(self.cols == b.cols);
+
+        let mut res = 0.0;
+
+        let m = self.rows;
+        let c = self.cols;
+
+        for i in 0..m {
+            for j in 0..c {
+                res += self.at(i, j) * b.at(i, j);
+            }
+        }
+
+        res
+    }
+
+    pub fn prod_element_wise(&mut self, value: f64) {
+        let m = self.rows;
+        let c = self.cols;
+
+        for i in 0..m {
+            for j in 0..c {
+                let cur = self.at(i, j);
+                self.set_element(i, j, cur * value);
+            }
+        }
+    }
+
+    pub fn add_element_wise(&mut self, value: f64) {
+        let m = self.rows;
+        let c = self.cols;
+
+        for i in 0..m {
+            for j in 0..c {
+                let cur = self.at(i, j);
+                self.set_element(i, j, cur + value);
+            }
+        }
+    }
+
+    pub fn divide_element_wise(&mut self, value: f64) {
+        assert!(value != 0.0);
+
+        let m = self.rows;
+        let c = self.cols;
+
+        for i in 0..m {
+            for j in 0..c {
+                let cur = self.at(i, j);
+                self.set_element(i, j, cur / value);
+            }
+        }
+    }
+
     /**
      * Multiplies this Matrix by `b`, using the provided `multiplier` function.
      */
@@ -230,19 +286,14 @@ impl Matrix {
  */
 impl fmt::Display for Matrix {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        let array_string = self
-            .elements
-            .iter()
-            .map(|i| i.to_string())
-            .collect::<Vec<String>>()
-            .join(", ");
-        write!(f, "Matrix {} X {}\n[\n", self.rows, self.cols);
+        write!(f, "Matrix {} X {}\n[\n", self.rows, self.cols).unwrap();
         for i in 0..self.rows {
-            write!(f, "\t");
+            write!(f, "\t").unwrap();
             for j in 0..self.cols {
-                write!(f, "{:.5}    ", self.at(i, j));
+                write!(f, "{:.5}    ", self.elements[i + j * self.rows]).unwrap();
+                // write!(f, "{:.5}    ", self.at(i, j)).unwrap();
             }
-            write!(f, "\n");
+            write!(f, "\n").unwrap();
         }
         write!(f, "]\n",)
     }

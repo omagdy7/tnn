@@ -1,5 +1,19 @@
 use std::fs;
 
+pub fn helper(x: &Vec<Vec<f64>>) -> Vec<Vec<f64>> {
+    let cols = x[0].len();
+    let rows = x.len();
+    let mut final_x = vec![];
+    for i in 0..cols {
+        let mut tmp = vec![];
+        for j in 0..rows {
+            tmp.push(x[j][i])
+        }
+        final_x.push(tmp);
+    }
+    final_x
+}
+
 pub fn get_training_data(mut path: &str) -> Vec<Vec<f64>> {
     let contents = fs::read_to_string(&mut path).unwrap();
     let line = contents.lines().next().unwrap();

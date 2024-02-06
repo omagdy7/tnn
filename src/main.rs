@@ -1,8 +1,8 @@
 use tnn::{
-    linear_algebra::par_mult::Matrix,
-    linear_regression::*,
-    model::Model,
-    polynomial_regression::PolynomialRegression,
+    linear_algebra::matrix::Matrix,
+    models::linear_regression::*,
+    models::model::Model,
+    models::polynomial_regression::PolynomialRegression,
     utils::{get_training_data, identity, normalize},
 };
 

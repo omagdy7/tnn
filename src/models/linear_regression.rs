@@ -1,26 +1,26 @@
 use crate::{
-    linear_algebra::{matrix::Matrix, par_mult::mult_par},
-    model::Model,
+    linear_algebra::{matrix::mult_par, matrix::Matrix},
+    models::model::Model,
     utils::helper,
 };
-use rand::thread_rng;
+use rand::{thread_rng, Rng};
 
 // dx/dw =  (2 * X^T * (X * W + b - Y)) / Y.rows
 fn dcost_w(x: &Matrix, y: &Matrix, w: &Matrix, b: f64) -> Matrix {
-    let mut predictions = mult_par(x, w);
+    let mut predictions = x * w;
     predictions.add_element_wise(b);
-    let errors = predictions.sub(y);
+    let errors = &predictions - y;
     let x_t = x.transpose();
-    let mut gradient_w = mult_par(&x_t, &errors);
+    let mut gradient_w = x_t * errors;
     gradient_w.divide_element_wise(y.rows as f64);
     gradient_w
 }
 
 // dx/db = 2 * x_i * w + b - y_i
 fn dcost_b(x: &Matrix, y: &Matrix, w: &Matrix, b: f64) -> f64 {
-    let mut predictions = mult_par(x, w);
+    let mut predictions = x * w;
     predictions.add_element_wise(b);
-    let errors = predictions.sub(y);
+    let errors = &predictions - y;
     errors.elements.iter().sum::<f64>() / y.rows as f64
 }
 
@@ -34,12 +34,10 @@ impl LinearRegression {
         let mut rng = thread_rng();
         let mut weights: Vec<f64> = vec![0.0; num_of_features];
         for i in 0..num_of_features {
-            // weights[i] = rng.gen_range(0.0..3.00);
-            weights[i] = 1.0;
+            weights[i] = rng.gen_range(0.0..3.00);
         }
         let weights = Matrix::with_vector(weights, num_of_features, 1);
-        // let bias = rng.gen_range(0.0..3.00);
-        let bias = 1.0;
+        let bias = rng.gen_range(0.0..3.00);
         LinearRegression { weights, bias }
     }
 }
@@ -86,7 +84,7 @@ impl Model for LinearRegression {
             let db = dcost_b(xs, y, &self.weights, self.bias);
             let mut gradient_w = dcost_w(xs, y, &self.weights, self.bias);
             gradient_w.prod_element_wise(learning_rate);
-            self.weights.sub(&gradient_w);
+            self.weights -= gradient_w;
             self.bias -= learning_rate * db;
 
             // println!(

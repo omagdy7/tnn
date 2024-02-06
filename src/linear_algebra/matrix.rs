@@ -1,4 +1,10 @@
-use std::fmt;
+use rayon::iter::IntoParallelIterator;
+use rayon::iter::ParallelIterator;
+use std::sync::{Arc, Mutex};
+use std::{
+    fmt,
+    ops::{Add, AddAssign, Mul, Sub, SubAssign},
+};
 
 /* Floating-point comparison precision */
 const EPSILON: f64 = 0.000001;
@@ -278,6 +284,151 @@ impl Matrix {
      */
     pub fn mult(&self, b: &Matrix, multipler: fn(&Matrix, &Matrix) -> Matrix) -> Matrix {
         return multipler(self, b);
+    }
+}
+
+fn add_matrix(a: &Matrix, b: &Matrix) -> Matrix {
+    let mut new_matrix = Matrix::new(a.rows, a.cols);
+    if a.rows == b.rows && a.cols == b.cols {
+        for i in 0..a.n {
+            new_matrix.elements[i] = a.elements[i] + b.elements[i];
+        }
+    } else {
+        panic!(
+            "matrices are not the same size! A: [{}, {}], B: [{}, {}]",
+            a.rows, a.cols, b.rows, b.cols
+        );
+    }
+
+    return new_matrix;
+}
+fn sub_matrix(a: &Matrix, b: &Matrix) -> Matrix {
+    let mut new_matrix = Matrix::new(a.rows, a.cols);
+    if a.rows == b.rows && a.cols == b.cols {
+        for i in 0..a.n {
+            new_matrix.elements[i] = a.elements[i] - b.elements[i];
+        }
+    } else {
+        panic!(
+            "matrices are not the same size! A: [{}, {}], B: [{}, {}]",
+            a.rows, a.cols, b.rows, b.cols
+        );
+    }
+
+    return new_matrix;
+}
+
+/**
+ * Variant of the naive multiplication algorithm, which uses the transpose of `b`, resuting in better memory locality performance characteristics. Still O(n^3).
+ * Panics if matrices `a` and `b` are of incompatbile dimensions.
+ */
+pub fn mult_transpose(a: &Matrix, b: &Matrix) -> Matrix {
+    if a.cols == b.rows {
+        let m = a.rows;
+        let n = b.cols;
+        let p = a.cols;
+        let t = b.transpose();
+        let mut c: Vec<f64> = Vec::with_capacity(m * n);
+
+        for i in 0..m {
+            for j in 0..n {
+                let mut sum: f64 = 0.0;
+                for k in 0..p {
+                    sum += a.at(i, k) * t.at(j, k);
+                }
+
+                c.push(sum);
+            }
+        }
+
+        return Matrix::with_vector(c, m, n);
+    } else {
+        panic!("Matrix sizes do not match");
+    }
+}
+
+pub fn mult_par(a: &Matrix, b: &Matrix) -> Matrix {
+    assert_eq!(a.cols, b.rows, "Matrix dimensions mismatch!");
+
+    // Check if the matrices are small, if so, use a simple sequential approach
+    if a.rows * a.cols * b.cols < 4096 {
+        return mult_transpose(a, b);
+    }
+
+    let result = Matrix::new(a.rows, b.cols);
+
+    // Create a mutable reference to result, wrapped in Arc and Mutex for safe parallelization
+    let result = Arc::new(Mutex::new(result));
+
+    (0..a.rows).into_par_iter().for_each(|i| {
+        for j in 0..b.cols {
+            let mut sum = 0.0;
+
+            for k in 0..a.cols {
+                sum += a.at(i, k) * b.at(k, j);
+            }
+
+            // Lock result matrix for writing
+            let mut result = result.lock().unwrap();
+            result.set_element(i, j, sum);
+        }
+    });
+
+    // Extract the result from the Arc and Mutex
+    Arc::try_unwrap(result).unwrap().into_inner().unwrap()
+}
+
+impl Add for &Matrix {
+    type Output = Matrix;
+    fn add(self, rhs: Self) -> Self::Output {
+        add_matrix(self, rhs)
+    }
+}
+
+impl Add for Matrix {
+    type Output = Matrix;
+    fn add(self, rhs: Self) -> Self::Output {
+        add_matrix(&self, &rhs)
+    }
+}
+
+impl Sub for &Matrix {
+    type Output = Matrix;
+    fn sub(self, rhs: Self) -> Self::Output {
+        sub_matrix(self, rhs)
+    }
+}
+
+impl Sub for Matrix {
+    type Output = Matrix;
+    fn sub(self, rhs: Self) -> Self::Output {
+        sub_matrix(&self, &rhs)
+    }
+}
+
+impl SubAssign for Matrix {
+    fn sub_assign(&mut self, rhs: Self) {
+        self.sub(&rhs);
+    }
+}
+
+impl AddAssign for Matrix {
+    fn add_assign(&mut self, rhs: Self) {
+        self.add(&rhs);
+    }
+}
+
+impl Mul for &Matrix {
+    type Output = Matrix;
+    fn mul(self, rhs: Self) -> Self::Output {
+        mult_par(self, rhs)
+    }
+}
+
+impl Mul for Matrix {
+    type Output = Matrix;
+    fn mul(self, rhs: Self) -> Self::Output {
+        mult_par(&self, &rhs)
     }
 }
 

@@ -81,11 +81,11 @@ impl Model for LinearRegression {
         let elements = helper(&elements);
         let elements: Vec<f64> = elements.into_iter().flatten().collect();
         let xs = &Matrix::with_vector(elements, xs.rows, self.weights.rows);
+
         for _ in 0..epochs {
             let db = dcost_b(xs, y, &self.weights, self.bias);
             let mut gradient_w = dcost_w(xs, y, &self.weights, self.bias);
             gradient_w.prod_element_wise(learning_rate);
-            // dbg!(&gradient_w);
             self.weights.sub(&gradient_w);
             self.bias -= learning_rate * db;
 

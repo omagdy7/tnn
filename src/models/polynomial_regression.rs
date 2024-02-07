@@ -5,7 +5,7 @@ use crate::{
 };
 use rand::{thread_rng, Rng};
 
-fn prepare_data(xs: &Matrix, degree: usize, rows: usize) -> Matrix {
+fn prepare_data(xs: &Matrix, degree: usize, rows: usize, include_interactions: bool) -> Matrix {
     let mut elements = vec![];
     for c in 0..xs.cols {
         let mut x_c = vec![0.0; xs.rows];
@@ -20,17 +20,22 @@ fn prepare_data(xs: &Matrix, degree: usize, rows: usize) -> Matrix {
             }
             elements.push(x_degree_i);
         }
-        for cc in c + 1..xs.cols {
-            let mut prod = vec![0.0; xs.rows];
-            for j in 0..xs.rows {
-                prod[j] = xs.elements[j + c * xs.rows] * xs.elements[j + cc * xs.rows];
+        if include_interactions {
+            for cc in c + 1..xs.cols {
+                let mut prod = vec![0.0; xs.rows];
+                for j in 0..xs.rows {
+                    prod[j] = xs.elements[j + c * xs.rows] * xs.elements[j + cc * xs.rows];
+                }
+                elements.push(prod);
             }
-            elements.push(prod);
         }
     }
+    println!("{xs}");
     let elements = helper(&elements);
     let elements: Vec<f64> = elements.into_iter().flatten().collect();
-    Matrix::with_vector(elements, xs.rows, rows)
+    let xs = Matrix::with_vector(elements, xs.rows, rows);
+    println!("{xs}");
+    xs
 }
 
 // dx/dw =  (2 * X^T * (X * W + b - Y)) / Y.rows
@@ -56,22 +61,27 @@ pub struct PolynomialRegression {
     weights: Matrix,
     bias: f64,
     degree: usize,
+    include_interactions: bool,
 }
 
 impl PolynomialRegression {
-    pub fn new(num_of_features: usize, degree: usize) -> Self {
+    pub fn new(num_of_features: usize, degree: usize, include_interactions: bool) -> Self {
         let mut rng = thread_rng();
-        let weights_len = num_of_features * degree + (num_of_features - 1) * (num_of_features) / 2;
+        let mut weights_len = num_of_features * degree;
+        if include_interactions {
+            weights_len = num_of_features * degree + (num_of_features - 1) * (num_of_features) / 2;
+        }
         let mut weights: Vec<f64> = vec![0.0; weights_len];
         for w in weights.iter_mut() {
-            *w = rng.gen_range(0.00..3.00);
+            *w = rng.gen_range(0.00..100.00);
         }
         let weights = Matrix::with_vector(weights, weights_len, 1);
-        let bias = rng.gen_range(0.00..1.00);
+        let bias = rng.gen_range(0.00..100.00);
         PolynomialRegression {
             degree,
             weights,
             bias,
+            include_interactions,
         }
     }
 }
@@ -101,8 +111,13 @@ impl Model for PolynomialRegression {
         learning_rate: f64,
         epochs: usize,
         activation_function: F,
-    ) {
-        let xs = &prepare_data(xs, self.degree, self.weights.rows);
+    ) -> f64 {
+        let xs = &prepare_data(
+            xs,
+            self.degree,
+            self.weights.rows,
+            self.include_interactions,
+        );
 
         for _ in 0..epochs {
             let db = dcost_b(xs, y, &self.weights, self.bias);
@@ -113,8 +128,9 @@ impl Model for PolynomialRegression {
         }
         println!(
             "MSE = {:?}",
-            self.cost(xs, y, &self.weights, self.bias, activation_function)
+            self.cost(xs, y, &self.weights, self.bias, &activation_function)
         );
+        self.cost(xs, y, &self.weights, self.bias, &activation_function)
     }
 
     fn predict<F: Fn(f64) -> f64>(&self, xs: Vec<f64>, activation_function: F) -> f64 {
@@ -135,5 +151,88 @@ impl Model for PolynomialRegression {
 
     fn dump(&self) {
         println!("weights: {}\nbias: {}", self.weights, self.bias);
+    }
+}
+
+mod tests {
+    use super::*;
+    use crate::utils::{get_training_data, identity, normalize};
+
+    const EPS: f64 = 0.00001;
+
+    fn test_helper(
+        dataset: &str,
+        features: usize,
+        degree: usize,
+        include_interactions: bool,
+        rate: f64,
+        epochs: usize,
+        is_normalize: bool,
+    ) -> f64 {
+        let mut model = PolynomialRegression::new(features, degree, include_interactions);
+        let data = get_training_data(&format!("train/{}.txt", dataset));
+        if is_normalize {
+            let (data, _, _) = normalize(data);
+            let (x, y) = (
+                data[0..data.len() - 1].to_vec(),
+                data.last().unwrap().to_vec(),
+            );
+            let cols = x[0].len();
+            let rows = x.len();
+            let final_x: Vec<f64> = x.into_iter().flatten().collect();
+            let x = Matrix::with_vector(final_x, cols, rows);
+            let y = Matrix::with_vector(y, cols, 1);
+            let error = model.fit(&x, &y, rate, epochs, identity);
+            error
+        } else {
+            let (x, y) = (
+                data[0..data.len() - 1].to_vec(),
+                data.last().unwrap().to_vec(),
+            );
+
+            let cols = x[0].len();
+            let rows = x.len();
+            let final_x: Vec<f64> = x.into_iter().flatten().collect();
+            let x = Matrix::with_vector(final_x, cols, rows);
+            let y = Matrix::with_vector(y, cols, 1);
+            let error = model.fit(&x, &y, rate, epochs, identity);
+            error
+        }
+    }
+
+    #[test]
+    fn square() {
+        assert!(test_helper("square", 1, 2, false, 1.25, 2000, true) - 0.0 < EPS)
+    }
+
+    #[test]
+    fn cube() {
+        assert!(test_helper("cube", 1, 3, false, 1.25, 5000 * 10, true) - 0.0 < EPS)
+    }
+
+    #[test]
+    fn product() {
+        assert!(test_helper("product", 2, 1, true, 1.25, 1000 * 10, true) - 0.0 < EPS)
+    }
+
+    #[test]
+    fn two_features_square() {
+        assert!(test_helper("polynomial_and_polynomial", 2, 2, true, 0.5, 5000, true) - 0.0 < EPS)
+    }
+
+    #[test]
+    fn complex_polynomial() {
+        assert!(
+            test_helper(
+                "complex_polynomial",
+                3,
+                3,
+                false,
+                1.14,
+                1000 * 1000 * 100,
+                true
+            ) - 0.0
+                < EPS
+        )
     }
 }

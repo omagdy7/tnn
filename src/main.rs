@@ -44,7 +44,7 @@ fn main() {
     let x = Matrix::with_vector(final_x, cols, rows);
     let y = Matrix::with_vector(y, cols, 1);
     println!("{}", x);
-    let mut model = PolynomialRegression::new(2, 1);
+    let mut model = PolynomialRegression::new(2, 1, true);
     model.fit(&x, &y, 0.5, 1000 * 1000, identity);
     model.dump();
     // dbg!(min_x, max_x - min_x);

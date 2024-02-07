@@ -16,7 +16,7 @@ pub trait Model {
         learning_rate: f64,
         epochs: usize,
         activation_function: F,
-    );
+    ) -> f64;
     fn predict<F: Fn(f64) -> f64>(&self, xs: Vec<f64>, activation_function: F) -> f64;
     fn dump(&self);
 }

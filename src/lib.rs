@@ -1,7 +1,5 @@
 pub mod linear_algebra {
     pub mod matrix;
-    pub mod mult;
-    pub mod par_mult;
 }
 pub mod models {
     pub mod linear_regression;

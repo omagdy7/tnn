@@ -1,10 +1,13 @@
-use rayon::iter::IntoParallelIterator;
-use rayon::iter::ParallelIterator;
+use rayon::prelude::*;
+use std::ops::{Index, IndexMut};
 use std::sync::{Arc, Mutex};
 use std::{
     fmt,
     ops::{Add, AddAssign, Mul, Sub, SubAssign},
 };
+
+use crate::utils::maxf;
+use crate::utils::minf;
 
 /* Floating-point comparison precision */
 const EPSILON: f64 = 0.000001;
@@ -185,6 +188,36 @@ impl Matrix {
 
             return Matrix::with_vector(v, n, n);
         }
+    }
+
+    pub fn set_row(&mut self, row: usize, values: &Vec<f64>) {
+        use std::cmp::min;
+        let mut cnt = 0;
+        for i in (row * self.cols)..(min(row + 1, self.rows) * self.cols) {
+            self.elements[i] = values[cnt];
+            cnt += 1;
+        }
+    }
+
+    pub fn normalize(&mut self) {
+        let mut max_x = f64::MIN;
+        let mut min_x = f64::MAX;
+        for i in 0..self.n {
+            max_x = maxf(max_x, self.elements[i]);
+            min_x = minf(min_x, self.elements[i]);
+        }
+        for i in 0..self.n {
+            let x = self.elements[i];
+            self.elements[i] = (x - min_x) / (max_x - min_x)
+        }
+    }
+
+    pub fn rows_n(&self, n: usize) -> Vec<f64> {
+        self.elements[0..n * self.cols].to_vec()
+    }
+
+    pub fn row(&self, row: usize) -> Vec<f64> {
+        self.elements[row * self.cols..(row + 1) * self.cols].to_vec()
     }
 
     /**
@@ -378,6 +411,20 @@ pub fn mult_par(a: &Matrix, b: &Matrix) -> Matrix {
     Arc::try_unwrap(result).unwrap().into_inner().unwrap()
 }
 
+// Indexing support
+impl Index<(usize, usize)> for Matrix {
+    type Output = f64;
+    fn index(&self, index: (usize, usize)) -> &Self::Output {
+        &self.elements[index.0 * self.cols + index.1]
+    }
+}
+
+impl IndexMut<(usize, usize)> for Matrix {
+    fn index_mut(&mut self, index: (usize, usize)) -> &mut Self::Output {
+        &mut self.elements[index.0 * self.cols + index.1]
+    }
+}
+
 impl Add for &Matrix {
     type Output = Matrix;
     fn add(self, rhs: Self) -> Self::Output {
@@ -441,11 +488,28 @@ impl fmt::Display for Matrix {
         for i in 0..self.rows {
             write!(f, "\t").unwrap();
             for j in 0..self.cols {
-                write!(f, "{:.5}    ", self.elements[i + j * self.rows]).unwrap();
-                // write!(f, "{:.5}    ", self.at(i, j)).unwrap();
+                write!(f, "{:.5}    ", self.at(i, j)).unwrap();
             }
             write!(f, "\n").unwrap();
         }
         write!(f, "]\n",)
     }
 }
+
+// /**
+//  * Pretty-printing for the Matrix struct.
+//  */
+// impl fmt::Display for Matrix {
+//     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+//         write!(f, "Matrix {} X {}\n[\n", self.rows, self.cols).unwrap();
+//         for i in 0..self.rows {
+//             write!(f, "\t").unwrap();
+//             for j in 0..self.cols {
+//                 write!(f, "{:.5}    ", self.elements[i + j * self.rows]).unwrap();
+//                 // write!(f, "{:.5}    ", self.at(i, j)).unwrap();
+//             }
+//             write!(f, "\n").unwrap();
+//         }
+//         write!(f, "]\n",)
+//     }
+// }

@@ -3,7 +3,7 @@ use tnn::{
     models::linear_regression::*,
     models::model::Model,
     models::polynomial_regression::PolynomialRegression,
-    utils::{get_training_data, identity, normalize},
+    utils::{get_training_data, identity},
 };
 
 fn main() {
@@ -31,35 +31,19 @@ fn main() {
     //     );
     // }
 
-    let data = get_training_data("train/product.txt");
-    let (data, min_x, max_x) = normalize(data);
+    let data = get_training_data("train/square.txt");
+    let (rows, cols) = (data.len(), data[0].len());
+    let data = Matrix::with_vector(data.into_iter().flatten().collect(), rows, cols).transpose();
 
-    let (x, y) = (
-        data[0..data.len() - 1].to_vec(),
-        data.last().unwrap().to_vec(),
-    );
-    let cols = x[0].len();
-    let rows = x.len();
-    let final_x: Vec<f64> = x.into_iter().flatten().collect();
-    let x = Matrix::with_vector(final_x, cols, rows);
+    let (x, y) = (data.rows_n(data.rows - 1), data.row(data.rows - 1));
+    let rows = data.rows;
+    let cols = data.cols;
+    let mut x = Matrix::with_vector(x, rows - 1, cols).transpose();
+    x.normalize();
+    println!("{x}");
     let y = Matrix::with_vector(y, cols, 1);
-    println!("{}", x);
-    let mut model = PolynomialRegression::new(2, 1, true);
-    model.fit(&x, &y, 0.5, 1000 * 1000, identity);
+    let mut model = PolynomialRegression::new(1, 2, false);
+    model.fit(&x.transpose(), &y, 0.5, 5000, identity);
     model.dump();
-    // dbg!(min_x, max_x - min_x);
-    println!(
-        "{} should be (15625)",
-        // model.predict(vec![22.0, 22.0], identity)
-        model.predict(
-            vec![
-                (24.0 - min_x) / (max_x - min_x),
-                (75.0 - min_x) / (max_x - min_x),
-                // (1.0 - min_x) / (max_x - min_x),
-                // (2.0 - min_x) / (max_x - min_x),
-                // (3.0 - min_x) / (max_x - min_x)
-            ],
-            identity
-        )
-    );
+    println!("{}", model.predict(vec![(24.0)], identity));
 }

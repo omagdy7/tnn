@@ -1,68 +1,34 @@
 use std::fs;
 
-pub fn helper(x: &Vec<Vec<f64>>) -> Vec<Vec<f64>> {
-    let cols = x[0].len();
-    let rows = x.len();
-    let mut final_x = vec![];
-    for i in 0..cols {
-        let mut tmp = vec![];
-        for j in 0..rows {
-            tmp.push(x[j][i])
-        }
-        final_x.push(tmp);
-    }
-    final_x
-}
-
 pub fn get_training_data(mut path: &str) -> Vec<Vec<f64>> {
     let contents = fs::read_to_string(&mut path).unwrap();
     let line = contents.lines().next().unwrap();
+    let rows = contents.lines().count();
     let cols = line.chars().filter(|ch| *ch == ' ').count() + 1;
 
-    let mut training_data = vec![vec![]; cols];
-    for line in contents.lines() {
-        let line: Vec<f64> = line.split(' ').map(|x| x.parse::<f64>().unwrap()).collect();
+    let mut training_data = vec![vec![0.0; cols]; rows];
+    for (j, line) in contents.lines().enumerate() {
         for i in 0..cols {
-            training_data[i].push(line[i]);
+            let line: Vec<f64> = line.split(' ').map(|x| x.parse::<f64>().unwrap()).collect();
+            training_data[j][i] = line[i];
         }
     }
     return training_data;
 }
 
-fn minf(f: f64, s: f64) -> f64 {
+pub fn minf(f: f64, s: f64) -> f64 {
     if f <= s {
         return f;
     } else {
         s
     }
 }
-fn maxf(f: f64, s: f64) -> f64 {
+pub fn maxf(f: f64, s: f64) -> f64 {
     if f >= s {
         return f;
     } else {
         s
     }
-}
-
-pub fn normalize(mut data: Vec<Vec<f64>>) -> (Vec<Vec<f64>>, f64, f64) {
-    let y = data.pop().unwrap();
-    let mut normalized_data = vec![vec![0.0; data[0].len()]; data.len()];
-    let mut max_x = f64::MIN;
-    let mut min_x = f64::MAX;
-    for i in 0..data.len() {
-        for j in 0..data[i].len() {
-            max_x = maxf(max_x, data[i][j]);
-            min_x = minf(min_x, data[i][j]);
-        }
-    }
-    for i in 0..data.len() {
-        for j in 0..data[i].len() {
-            let x = data[i][j];
-            normalized_data[i][j] = (x - min_x) / (max_x - min_x)
-        }
-    }
-    normalized_data.push(y);
-    (normalized_data, min_x, max_x)
 }
 
 pub fn standardize(data: Vec<Vec<f64>>) -> Vec<Vec<f64>> {

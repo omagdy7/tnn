@@ -1,7 +1,6 @@
 use crate::{
     linear_algebra::{matrix::mult_par, matrix::Matrix},
     models::model::Model,
-    utils::helper,
 };
 use rand::{thread_rng, Rng};
 
@@ -68,17 +67,7 @@ impl Model for LinearRegression {
         epochs: usize,
         activation_function: F,
     ) -> f64 {
-        let mut elements = vec![];
-        for c in 0..xs.cols {
-            let mut x_c = vec![0.0; xs.rows];
-            for j in 0..xs.rows {
-                x_c[j] = xs.elements[j + c * xs.rows];
-            }
-            elements.push(x_c);
-        }
-        let elements = helper(&elements);
-        let elements: Vec<f64> = elements.into_iter().flatten().collect();
-        let xs = &Matrix::with_vector(elements, xs.rows, self.weights.rows);
+        let xs = &xs.transpose();
 
         for _ in 0..epochs {
             let db = dcost_b(xs, y, &self.weights, self.bias);
@@ -115,7 +104,7 @@ impl Model for LinearRegression {
 
 mod tests {
     use super::*;
-    use crate::utils::{get_training_data, identity, normalize};
+    use crate::utils::{get_training_data, identity};
 
     const EPS: f64 = 0.00001;
 
@@ -126,59 +115,46 @@ mod tests {
         epochs: usize,
         is_normalize: bool,
     ) -> f64 {
-        let mut model = LinearRegression::new(features);
         let data = get_training_data(&format!("train/{}.txt", dataset));
-        if is_normalize {
-            let (data, _, _) = normalize(data);
-            let (x, y) = (
-                data[0..data.len() - 1].to_vec(),
-                data.last().unwrap().to_vec(),
-            );
-            let cols = x[0].len();
-            let rows = x.len();
-            let final_x: Vec<f64> = x.into_iter().flatten().collect();
-            let x = Matrix::with_vector(final_x, cols, rows);
-            let y = Matrix::with_vector(y, cols, 1);
-            let error = model.fit(&x, &y, rate, epochs, identity);
-            error
-        } else {
-            let (x, y) = (
-                data[0..data.len() - 1].to_vec(),
-                data.last().unwrap().to_vec(),
-            );
+        let (rows, cols) = (data.len(), data[0].len());
+        let data =
+            Matrix::with_vector(data.into_iter().flatten().collect(), rows, cols).transpose();
 
-            let cols = x[0].len();
-            let rows = x.len();
-            let final_x: Vec<f64> = x.into_iter().flatten().collect();
-            let x = Matrix::with_vector(final_x, cols, rows);
-            let y = Matrix::with_vector(y, cols, 1);
-            let error = model.fit(&x, &y, rate, epochs, identity);
-            error
+        println!("data: {data}");
+        let (x, y) = (data.rows_n(data.rows - 1), data.row(data.rows - 1));
+        let rows = data.rows;
+        let cols = data.cols;
+        let mut x = Matrix::with_vector(x, rows - 1, cols).transpose();
+        if is_normalize {
+            x.normalize();
         }
+        let y = Matrix::with_vector(y, cols, 1);
+        let mut model = LinearRegression::new(features);
+        model.fit(&x.transpose(), &y, rate, epochs, identity)
     }
 
     #[test]
     fn double_basic() {
-        assert!(test_helper("double", 1, 0.5, 1000, true) - 0.0 < EPS)
+        assert!(test_helper("double", 1, 1.25, 1000, true) - 0.0 < EPS)
     }
 
     #[test]
     fn double_with_bias() {
-        assert!(test_helper("double_plus_one", 1, 0.5, 1000, true) - 0.0 < EPS)
+        assert!(test_helper("double_plus_one", 1, 1.25, 1000, true) - 0.0 < EPS)
     }
 
     #[test]
     fn add_basic() {
-        assert!(test_helper("add", 2, 1.0, 1000, true) - 0.0 < EPS)
+        assert!(test_helper("add", 2, 1.0, 5000, true) - 0.0 < EPS)
     }
 
     #[test]
     fn add_complex() {
-        assert!(test_helper("complex_add", 3, 1.0, 10000, true) - 0.0 < EPS)
+        assert!(test_helper("complex_add", 3, 0.75, 1000 * 10, true) - 0.0 < EPS)
     }
 
     #[test]
     fn four_times_plus_seven() {
-        assert!(test_helper("four_times_plus_seven", 1, 1.0, 1000, true) - 0.0 < EPS)
+        assert!(test_helper("four_times_plus_seven", 1, 1.5, 2000, true) - 0.0 < EPS)
     }
 }
